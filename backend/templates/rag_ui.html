@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RAG Learning System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .loader { display: none; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <h2 class="mb-4">RAG Learning System</h2>
+    <div class="mb-3">
+        <label for="chapter" class="form-label">Select Chapter:</label>
+        <select id="chapter" class="form-select">
+            {% for ch in chapters %}
+                <option value="{{ch}}">{{ch}}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button id="generate-notes" class="btn btn-success mb-3">Generate Notes</button>
+    <div id="notes" class="mb-4"></div>
+    <hr>
+    <div class="mb-3">
+        <label for="num-mcqs" class="form-label">Number of MCQs:</label>
+        <input type="number" id="num-mcqs" class="form-control w-auto d-inline" value="3" min="1" max="100">
+        <button id="generate-mcqs" class="btn btn-warning ms-2">Start MCQ Quiz</button>
+    </div>
+    <form id="mcq-form" style="display:none;">
+        <div id="mcqs"></div>
+        <button type="submit" class="btn btn-primary mt-3">Submit Answers</button>
+    </form>
+    <div id="results" class="mt-4"></div>
+    <div class="loader mt-3 text-center">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span>Loading...</span>
+    </div>
+</div>
+<script>
+function showLoader(show) {
+    document.querySelector('.loader').style.display = show ? 'block' : 'none';
+}
+document.getElementById('generate-notes').onclick = function() {
+    showLoader(true);
+    fetch('/generate_notes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chapter: document.getElementById('chapter').value})
+    }).then(r => r.json()).then(data => {
+        showLoader(false);
+        if(data.success) {
+            document.getElementById('notes').innerHTML = '<pre>' + data.notes + '</pre>';
+        } else {
+            document.getElementById('notes').innerHTML = '<div class="alert alert-danger">' + data.error + '</div>';
+        }
+    });
+};
+document.getElementById('generate-mcqs').onclick = function() {
+    showLoader(true);
+    fetch('/generate_mcqs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            chapter: document.getElementById('chapter').value,
+            num_mcqs: document.getElementById('num-mcqs').value
+        })
+    }).then(r => r.json()).then(data => {
+        showLoader(false);
+        if(data.success) {
+            let html = '';
+            data.mcqs.forEach((mcq, i) => {
+                html += `<div class=\"mb-3\"><b>Q${i+1}: ${mcq.question}</b><br>`;
+                mcq.options.forEach((opt, j) => {
+                    html += `<div class=\"form-check\">
+                        <input class=\"form-check-input\" type=\"radio\" name=\"q${i}\" value=\"${j}\" required>
+                        <label class=\"form-check-label\">${opt}</label>
+                    </div>`;
+                });
+                html += '</div>';
+            });
+            document.getElementById('mcqs').innerHTML = html;
+            document.getElementById('mcq-form').style.display = '';
+            document.getElementById('results').innerHTML = '';
+        } else {
+            document.getElementById('mcqs').innerHTML = '';
+            document.getElementById('results').innerHTML = '<div class=\"alert alert-danger\">' + data.error + '</div>';
+        }
+    });
+};
+document.getElementById('mcq-form').onsubmit = function(e) {
+    e.preventDefault();
+    showLoader(true);
+    let user_answers = [];
+    let mcqs = [];
+    document.querySelectorAll('#mcqs > div').forEach((div, i) => {
+        let q = div.querySelector('b').innerText.replace(/^Q\\d+: /, '');
+        let opts = Array.from(div.querySelectorAll('input[type=radio]')).map(r => r.nextElementSibling.innerText);
+        let selected = Array.from(div.querySelectorAll('input[type=radio]')).findIndex(r => r.checked);
+        user_answers.push(selected);
+        mcqs.push({question: q, options: opts});
+    });
+    fetch('/check_mcqs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            chapter: document.getElementById('chapter').value,
+            user_answers: user_answers,
+            mcqs: mcqs
+        })
+    }).then(r => r.json()).then(data => {
+        showLoader(false);
+        let html = '';
+        let correct = 0;
+        data.results.forEach((res, i) => {
+            html += `<div class=\"mb-3\"><b>Q${i+1}: ${res.question}</b><br>
+                <span>Your answer: ${res.user_answer}</span><br>
+                <span>Correct answer: ${res.correct_answer}</span><br>`;
+            if(!res.is_correct) {
+                html += `<div class=\"alert alert-info mt-2\">Explanation: ${res.explanation}</div>`;
+            } else {
+                correct++;
+            }
+            html += '</div>';
+        });
+        html = `<div class=\"alert alert-success\">Your score: ${correct} / ${data.results.length}</div>` + html;
+        document.getElementById('results').innerHTML = html;
+    });
+};
+</script>
+</body>
+</html> 

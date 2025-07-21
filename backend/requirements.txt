@@ -8,4 +8,6 @@ faiss-cpu
 python-multipart
 requests 
 together
-python-dotenv 
+python-dotenv
+Flask 
+streamlit 

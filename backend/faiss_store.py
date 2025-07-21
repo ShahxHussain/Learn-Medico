@@ -48,5 +48,9 @@ class ChapterFaissStore:
         index, id2chunk = self.indexes[unit]
         query_emb = self.embed_chunks([query])
         D, I = index.search(query_emb, top_k)
-        results = [(id2chunk[i], float(D[0][j])) for j, i in enumerate(I[0])]
+        results = []
+        for j, i in enumerate(I[0]):
+            if i == -1:
+                continue  # skip invalid results
+            results.append((id2chunk[i], float(D[0][j])))
         return results 
