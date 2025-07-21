@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pdf2image
+pytesseract
+paddleocr
+sentence-transformers
+faiss-cpu
+python-multipart
+requests 
+together
+python-dotenv 
